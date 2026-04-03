@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ChevronRight, ChevronLeft, Menu, X, Loader2 } from "lucide-react";
-import mainIcon from "../assets/icons/main_icon.png";
+import mainIcon from "../assets/icons/main_icon2.png";
 
 import Step1CaseAllocation  from "../components/AddCase/Step1CaseAllocation";
 import Step2CompanyContact  from "../components/AddCase/Step2CompayContact";
@@ -340,7 +340,7 @@ export default function CasePage({ mode = "add" }) {
 
       if (res.success) {
         showToast(`Case ${isAdd ? "created" : "updated"} successfully!`, "success");
-        setTimeout(() => navigate("/"), 1500);
+        setTimeout(() => navigate("/user-dashboard"), 1500);
       }
     } catch (err) {
       const rawMsg = err?.response?.data?.message;

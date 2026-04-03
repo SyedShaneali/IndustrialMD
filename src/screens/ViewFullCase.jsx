@@ -403,7 +403,7 @@ export default function ViewFullCase() {
             )}
 
             {isViewingCurrent && (
-              <button onClick={() => navigate(`/case/edit/${id}`)}
+              <button onClick={() => navigate(`/case/edit-details/${id}`)}
                 className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-sm font-semibold text-white shadow-sm hover:opacity-90 transition-all"
                 style={{ backgroundColor: "#0148AF" }}>
                 <Pencil className="w-3.5 h-3.5" /> Edit Case

@@ -6,10 +6,15 @@ const rows = [
 ];
 
 function Avatar({ name }) {
-  const initials = name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase();
+  const imageUrl = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRQa8Rxqr_hb8AMHN4DEEg_cGg4yUNdaX6lyg&s";
+
   return (
-    <div className="w-7 h-7 rounded-full bg-gray-300 flex items-center justify-center text-[10px] font-bold text-gray-600 shrink-0">
-      {initials}
+    <div className="w-7 h-7 rounded-full overflow-hidden bg-gray-200 flex-shrink-0 border border-gray-100">
+      <img 
+        src={imageUrl} 
+        alt={name} 
+        className="w-full h-full object-cover"
+      />
     </div>
   );
 }
