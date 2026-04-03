@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
-import { COLUMNS } from "./caseUtils";
+import { COLUMNS } from "./Caseutils";
 import StatusBadge from "./StatusBadge";
-import { IconDoc, IconEdit, IconDownload, IconEmail, IconFilter } from "./icons";
+import { IconDoc, IconEdit, IconDownload, IconEmail, IconFilter } from "./Icons";
 
 // ── Desktop table head ─────────────────────────────────────────────────────────
 function TableHead({ filters, onFilterChange }) {

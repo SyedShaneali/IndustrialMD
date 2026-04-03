@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { IconSearch } from "./icons";
+import { IconSearch } from "./Icons";
 import { SlidersHorizontal, X } from "lucide-react";
 
 export default function TopBar({ activeTab, setActiveTab, search, setSearch, onPageReset }) {
