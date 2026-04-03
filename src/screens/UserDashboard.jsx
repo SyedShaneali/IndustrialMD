@@ -6,7 +6,7 @@ import CaseTable from "../components/UserDashboard/CaseTable";
 import Pagination from "../components/UserDashboard/Pagination";
 import { axiosInstance } from "../lib/axios";
 import { Plus, X } from "lucide-react";
-import { mapCase } from "../components/UserDashboard/caseUtils";
+import { mapCase } from "../components/UserDashboard/Caseutils";
 
 const ROWS_PER_PAGE = 8;
 
