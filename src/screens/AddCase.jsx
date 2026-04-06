@@ -25,15 +25,6 @@ const STEPS = [
   { label: "Follow Up & Case Management",                 sub: "Step 7" },
 ];
 
-const REQUIRED_FIELDS = [
-  "managingCompany", "dateIndustrialMDNotified",
-  "companyPOCFirstName", "companyPOCLastName",
-  "companyPOCJobTitle", "companyPOCPhoneNumber",
-  "empFirstName", "empLastName", "empAge",
-  "reportedDateOfInjury", "reportedTimeOfInjury",
-  "reportedTimeOfInjuryAMPM", "reportedDateCompanyNotified",
-];
-
 const STEP_FIELDS = [
   [
     "caseNumber", "managingCompany", "assignedProvider",
@@ -177,6 +168,7 @@ export default function CasePage({ mode = "add" }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [loading,     setLoading]     = useState(false);
+  const [saving,      setSaving]      = useState(false); // separate state for Save & Exit
   const [fetching,    setFetching]    = useState(!isAdd);
   const [toast,       setToast]       = useState({ message: "", type: "success" });
   const [stepData,    setStepData]    = useState([{}, {}, {}, {}, {}, {}, {}]);
@@ -227,7 +219,6 @@ export default function CasePage({ mode = "add" }) {
   // ─── Keyboard shortcuts ───────────────────────────────────────────────────
   useEffect(() => {
     const handleKeyDown = (e) => {
-      // Edit / Add mode: Ctrl+Enter → next step (or submit on last step in Add)
       if (!isView && e.ctrlKey && e.key === "Enter") {
         e.preventDefault();
         if (currentStep < STEPS.length - 1) {
@@ -238,10 +229,8 @@ export default function CasePage({ mode = "add" }) {
         return;
       }
 
-      // View mode: plain Enter → next step
       if (isView && e.key === "Enter" && !e.ctrlKey && !e.metaKey) {
         const tag = document.activeElement?.tagName;
-        // Let Enter still work normally on buttons and links
         if (tag === "BUTTON" || tag === "A") return;
         e.preventDefault();
         if (currentStep < STEPS.length - 1) handleNext();
@@ -297,67 +286,66 @@ export default function CasePage({ mode = "add" }) {
     return timeTakenMs;
   };
 
-  // ─── Submit (shared by both Add final step & Edit save anywhere) ─────────
-  const handleSubmit = async () => {
-    const payload = Object.assign({}, ...stepData);
+  // ─── Build FormData from current stepData ────────────────────────────────
+  const buildFormData = (timeTakenMs) => {
+    const payload    = Object.assign({}, ...stepData);
+    const formData   = new FormData();
 
-    if (isAdd) {
-      const missing = REQUIRED_FIELDS.filter((key) => !payload[key]);
-      if (missing.length > 0) {
-        showToast("Please fill in all required fields.", "error");
-        return;
-      }
-    }
+    formData.append("formFillDurationMs", timeTakenMs);
 
-    const timeTakenMs = logTimeTaken();
+    const caseUploads = payload.caseUploads || [];
+    const uploadsMeta = [];
 
-    try {
-      setLoading(true);
-      const formData = new FormData();
-      formData.append("formFillDurationMs", timeTakenMs);
-
-      const caseUploads = payload.caseUploads || [];
-      const uploadsMeta = [];
-
-      caseUploads.forEach((upload) => {
-        if (upload._fileKey) {
-          const file = fileStoreRef.current[upload._fileKey];
-          if (file instanceof File) {
-            formData.append("files", file);
-            uploadsMeta.push({
-              fileName:        upload.fileName,
-              contentType:     upload.contentType,
-              visibleToClient: upload.visibleToClient || false,
-            });
-          } else {
-            console.error("File not found in store for key:", upload._fileKey);
-          }
-        } else {
+    caseUploads.forEach((upload) => {
+      if (upload._fileKey) {
+        const file = fileStoreRef.current[upload._fileKey];
+        if (file instanceof File) {
+          formData.append("files", file);
           uploadsMeta.push({
             fileName:        upload.fileName,
             contentType:     upload.contentType,
             visibleToClient: upload.visibleToClient || false,
-            publicId:        upload.publicId,
-            fileUrl:         upload.fileUrl,
           });
-        }
-      });
-
-      formData.append("caseUploads",              JSON.stringify(uploadsMeta));
-      formData.append("treatmentRecommendations", JSON.stringify(payload.treatmentRecommendations || []));
-      formData.append("followUpTasks",            JSON.stringify(payload.followUpTasks            || []));
-
-      const skip = new Set(["treatmentRecommendations", "followUpTasks", "caseUploads", "files"]);
-
-      Object.entries(payload).forEach(([key, value]) => {
-        if (skip.has(key))                                         return;
-        if (value === undefined || value === null || value === "") return;
-        if (typeof value === "object" && !(value instanceof File)) {
-          formData.append(key, JSON.stringify(value));
         } else {
-          formData.append(key, value);
+          console.error("File not found in store for key:", upload._fileKey);
         }
-      });
+      } else {
+        uploadsMeta.push({
+          fileName:        upload.fileName,
+          contentType:     upload.contentType,
+          visibleToClient: upload.visibleToClient || false,
+          publicId:        upload.publicId,
+          fileUrl:         upload.fileUrl,
+        });
+      }
+    });
+
+    formData.append("caseUploads",              JSON.stringify(uploadsMeta));
+    formData.append("treatmentRecommendations", JSON.stringify(payload.treatmentRecommendations || []));
+    formData.append("followUpTasks",            JSON.stringify(payload.followUpTasks            || []));
+
+    const skip = new Set(["treatmentRecommendations", "followUpTasks", "caseUploads", "files"]);
+
+    Object.entries(payload).forEach(([key, value]) => {
+      if (skip.has(key))                                         return;
+      if (value === undefined || value === null || value === "") return;
+      if (typeof value === "object" && !(value instanceof File)) {
+        formData.append(key, JSON.stringify(value));
+      } else {
+        formData.append(key, value);
+      }
+    });
+
+    return formData;
+  };
+
+  // ─── Submit (save case — no validation) ──────────────────────────────────
+  const handleSubmit = async () => {
+    const timeTakenMs = logTimeTaken();
+
+    try {
+      setLoading(true);
+      const formData = buildFormData(timeTakenMs);
 
       let res;
       if (isAdd) {
@@ -381,6 +369,33 @@ export default function CasePage({ mode = "add" }) {
       console.error("Submission Error:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  // ─── Save & Exit (Add mode only) — saves partial data then navigates ─────
+  const handleSaveAndExit = async () => {
+    const timeTakenMs = logTimeTaken();
+
+    try {
+      setSaving(true);
+      const formData = buildFormData(timeTakenMs);
+      const res = await createCase(formData);
+
+      if (res.success) {
+        showToast("Case saved successfully!", "success");
+        setTimeout(() => navigate("/user-dashboard"), 1500);
+      }
+    } catch (err) {
+      const rawMsg = err?.response?.data?.message;
+      const msg = typeof rawMsg === "string"
+        ? rawMsg
+        : rawMsg
+        ? JSON.stringify(rawMsg)
+        : "Check your connection or console for errors.";
+      showToast(msg, "error");
+      console.error("Save & Exit Error:", err);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -413,6 +428,8 @@ export default function CasePage({ mode = "add" }) {
 
   const pageTitle = isAdd ? "Add New Case" : isEdit ? "Edit Case" : "View Case";
 
+  const isSubmitBusy = loading || saving;
+
   // ─── Footer right-side button logic ──────────────────────────────────────
   const renderRightButton = () => {
     // VIEW mode
@@ -440,7 +457,8 @@ export default function CasePage({ mode = "add" }) {
       return currentStep < STEPS.length - 1 ? (
         <button
           onClick={handleNext}
-          className="flex items-center gap-1.5 px-6 py-2.5 rounded-xl text-sm font-semibold text-white shadow-sm hover:opacity-90 transition-all"
+          disabled={isSubmitBusy}
+          className="flex items-center gap-1.5 px-6 py-2.5 rounded-xl text-sm font-semibold text-white shadow-sm hover:opacity-90 disabled:opacity-50 transition-all"
           style={{ backgroundColor: "#0148AF" }}
         >
           Next <ChevronRight className="w-4 h-4" />
@@ -448,7 +466,7 @@ export default function CasePage({ mode = "add" }) {
       ) : (
         <button
           onClick={handleSubmit}
-          disabled={loading}
+          disabled={isSubmitBusy}
           className="flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white bg-green-600 hover:bg-green-700 disabled:opacity-70 disabled:cursor-not-allowed shadow-sm transition-all"
         >
           {loading
@@ -462,7 +480,6 @@ export default function CasePage({ mode = "add" }) {
     if (isEdit) {
       return (
         <div className="flex items-center gap-2">
-          {/* Save Changes — always visible in edit mode */}
           <button
             onClick={handleSubmit}
             disabled={loading}
@@ -473,7 +490,6 @@ export default function CasePage({ mode = "add" }) {
               : <>✓ Save Changes</>}
           </button>
 
-          {/* Next — only if not on last step */}
           {currentStep < STEPS.length - 1 && (
             <button
               onClick={handleNext}
@@ -575,13 +591,28 @@ export default function CasePage({ mode = "add" }) {
           {/* Footer */}
           <div className="shrink-0 px-6 sm:px-10 py-5 border-t border-gray-200 flex items-center justify-between bg-white">
 
-            <button
-              onClick={handleBack}
-              disabled={currentStep === 0}
-              className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-medium text-gray-500 bg-gray-100 hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-            >
-              <ChevronLeft className="w-4 h-4" /> Back
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handleBack}
+                disabled={currentStep === 0 || isSubmitBusy}
+                className="flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-sm font-medium text-gray-500 bg-gray-100 hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" /> Back
+              </button>
+
+              {/* Save & Exit — only visible in Add mode */}
+              {isAdd && (
+                <button
+                  onClick={handleSaveAndExit}
+                  disabled={isSubmitBusy}
+                  className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                >
+                  {saving
+                    ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+                    : <>↗ Save &amp; Exit</>}
+                </button>
+              )}
+            </div>
 
             <span className="text-sm text-gray-400 font-medium hidden sm:block">
               Step {currentStep + 1} of {STEPS.length}
