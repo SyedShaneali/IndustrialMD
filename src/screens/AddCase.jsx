@@ -224,6 +224,34 @@ export default function CasePage({ mode = "add" }) {
     })();
   }, [id]);
 
+  // ─── Keyboard shortcuts ───────────────────────────────────────────────────
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Edit / Add mode: Ctrl+Enter → next step (or submit on last step in Add)
+      if (!isView && e.ctrlKey && e.key === "Enter") {
+        e.preventDefault();
+        if (currentStep < STEPS.length - 1) {
+          handleNext();
+        } else if (isAdd) {
+          handleSubmit();
+        }
+        return;
+      }
+
+      // View mode: plain Enter → next step
+      if (isView && e.key === "Enter" && !e.ctrlKey && !e.metaKey) {
+        const tag = document.activeElement?.tagName;
+        // Let Enter still work normally on buttons and links
+        if (tag === "BUTTON" || tag === "A") return;
+        e.preventDefault();
+        if (currentStep < STEPS.length - 1) handleNext();
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isView, isAdd, currentStep]);
+
   // ─── Toast ───────────────────────────────────────────────────────────────
   const showToast = (message, type = "success") => {
     setToast({ message, type });

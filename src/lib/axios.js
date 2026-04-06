@@ -3,7 +3,7 @@ import axios from "axios";
 export const axiosInstance = axios.create({
   baseURL:
     import.meta.env.MODE === "development"
-      ? "https://d721-72-255-34-72.ngrok-free.app/api"
+      ? " https://0135-72-255-34-72.ngrok-free.app/api"
       : import.meta.env.VITE_API_URL,
   withCredentials: true,
   headers: {
